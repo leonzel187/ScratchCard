@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width:206px; height:332px;
+    overflow:hidden;
+    background:transparent;
+  }
+  #wrapper {
+    position:relative;
+    width:206px; height:332px;
+  }
+  #revealed {
+    position:absolute; inset:0;
+    background:transparent;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+  }
+  #card {
+    background:#f5f0e8;
+    border-radius:14px;
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px 18px;
+  }
+  #card p {
+    font-family: Arial, sans-serif;
+    font-size:17px;
+    line-height:1.6;
+    color:#1a1a1a;
+    text-align:right;
+    direction:rtl;
+  }
+  canvas {
+    position:absolute;
+    inset:0;
+    cursor: url('שקל-removebg-preview.png') 32 32, crosshair;
+    touch-action:none;
+    border-radius:0;
+  }
+</style>
+</head>
+<body>
+<div id="wrapper">
+
+  <div id="revealed">
+    <div id="card">
+      <p>שיחקת אותה!<br>המצאת סיפור שלם והקול שלך בכלל לא רעד. המכשיר פספס אותך לגמרי</p>
+    </div>
+  </div>
+
+  <canvas id="c"></canvas>
+</div>
+
+<script>
+const W = 206, H = 332;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = W;
+canvas.height = H;
+
+// אין רקע — רק הכרטיס הכסוף עם פינות מעוגלות
+
+// הכרטיס עצמו בצבע כסוף
+ctx.save();
+roundRect(ctx, 10, 10, W-20, H-20, 14);
+ctx.fillStyle = '#B0B0B0';
+ctx.fill();
+ctx.restore();
+
+// טקסטורת "כסף" — פסים עדינים
+ctx.save();
+roundRect(ctx, 10, 10, W-20, H-20, 14);
+ctx.clip();
+for (let i = 0; i < 400; i++) {
+  const alpha = Math.random() * 0.25;
+  const gray = 130 + Math.random() * 60;
+  ctx.fillStyle = `rgba(${gray},${gray},${gray},${alpha})`;
+  ctx.fillRect(Math.random()*W, Math.random()*H, Math.random()*50+5, 1.5);
+}
+// ניצוצות
+for (let i = 0; i < 60; i++) {
+  ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.35})`;
+  ctx.fillRect(Math.random()*W, Math.random()*H, Math.random()*8+2, Math.random()*8+2);
+}
+ctx.restore();
+
+// טקסט הנחיה
+ctx.fillStyle = 'rgba(60,60,60,0.55)';
+ctx.font = 'bold 14px Arial';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('גרד לגילוי ✦', W/2, H/2);
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.arcTo(x+w, y, x+w, y+r, r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+  ctx.lineTo(x+r, y+h);
+  ctx.arcTo(x, y+h, x, y+h-r, r);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x, y, x+r, y, r);
+  ctx.closePath();
+}
+
+let painting = false;
+const THRESHOLD = 45;
+let done = false;
+let checkCounter = 0;
+
+function getXY(e) {
+  const r = canvas.getBoundingClientRect();
+  if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function scratch(e) {
+  if (!painting || done) return;
+  e.preventDefault();
+  const { x, y } = getXY(e);
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(x, y, 20, 0, Math.PI * 2);
+  ctx.fill();
+  if (++checkCounter % 10 === 0) checkDone();
+}
+
+function checkDone() {
+  const data = ctx.getImageData(0, 0, W, H).data;
+  let cleared = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i] === 0) cleared++;
+  const pct = (cleared / (W * H)) * 100;
+  if (pct >= THRESHOLD) {
+    done = true;
+    setTimeout(() => { canvas.style.display = 'none'; }, 300);
+    try { parent.window.GetPlayer().SetVar("ScratchComplete", true); } catch(err) {}
+  }
+}
+
+canvas.addEventListener('mousedown',  e => { painting = true; scratch(e); });
+canvas.addEventListener('mousemove',  scratch);
+canvas.addEventListener('mouseup',    () => painting = false);
+canvas.addEventListener('mouseleave', () => painting = false);
+canvas.addEventListener('touchstart', e => { painting = true; scratch(e); }, { passive: false });
+canvas.addEventListener('touchmove',  scratch, { passive: false });
+canvas.addEventListener('touchend',   () => painting = false);
+</script>
+</body>
+</html>
